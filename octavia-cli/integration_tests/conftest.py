@@ -6,6 +6,7 @@ import os
 
 import pytest
 import yaml
+from airbyte_api_client.api import connection_api
 from octavia_cli.apply.resources import Connection, Destination, Source
 from octavia_cli.entrypoint import get_api_client, get_workspace_id
 from octavia_cli.init.commands import DIRECTORIES_TO_CREATE as OCTAVIA_PROJECT_DIRECTORIES
@@ -124,5 +125,5 @@ def connection(api_client, workspace_id, octavia_test_project_directory, source,
     configuration, configuration_path = updated_connection_configuration_and_path(octavia_test_project_directory, source, destination)
     connection = Connection(api_client, workspace_id, configuration, configuration_path)
     yield connection
-    connection.api_instance.delete_connection(connection.resource_id_request_body)
+    connection_api.ConnectionApi(api_client).delete_connection(connection.resource_id_request_body)
     silent_remove(configuration_path)

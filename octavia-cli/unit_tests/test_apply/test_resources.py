@@ -425,18 +425,18 @@ class TestConnection:
         mocker.patch.object(resources.Connection, "resource_id", "foo")
         connection = resources.Connection(mock_api_client, "workspace_id", connection_configuration, "bar.yaml")
         mocker.patch.object(connection, "state", state)
-        assert connection.api == resources.connection_api.ConnectionApi
-        assert connection.create_function_name == "create_connection"
+        assert connection.api == resources.web_backend_api.WebBackendApi
+        assert connection.create_function_name == "web_backend_create_connection"
         assert connection.resource_id_field == "connection_id"
-        assert connection.search_function_name == "search_connections"
-        assert connection.update_function_name == "update_connection"
+        assert connection.search_function_name == "web_backend_search_connections"
+        assert connection.update_function_name == "web_backend_update_connection"
         assert connection.resource_type == "connection"
         assert connection.APPLY_PRIORITY == 1
 
-        assert connection.create_payload == resources.ConnectionCreate(
+        assert connection.create_payload == resources.WebBackendConnectionCreate(
             **connection.configuration, _check_type=False, _spec_property_naming=True
         )
-        assert connection.update_payload == resources.ConnectionUpdate(
+        assert connection.update_payload == resources.WebBackendConnectionUpdate(
             connection_id=connection.resource_id,
             sync_catalog=connection.configuration["syncCatalog"],
             status=connection.configuration["status"],
@@ -448,7 +448,7 @@ class TestConnection:
             _check_type=False,
         )
         if state is None:
-            assert connection.search_payload == resources.ConnectionSearch(
+            assert connection.search_payload == resources.WebBackendConnectionSearch(
                 source_id=connection.source_id,
                 destination_id=connection.destination_id,
                 name=connection.resource_name,
@@ -457,7 +457,7 @@ class TestConnection:
                 ),
             )
         else:
-            assert connection.search_payload == resources.ConnectionSearch(
+            assert connection.search_payload == resources.WebBackendConnectionSearch(
                 connection_id=connection.state.resource_id, source_id=connection.source_id, destination_id=connection.destination_id
             )
 

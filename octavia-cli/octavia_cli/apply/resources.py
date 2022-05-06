@@ -10,15 +10,12 @@ from typing import Any, Callable, Optional, Union
 
 import airbyte_api_client
 import yaml
-from airbyte_api_client.api import connection_api, destination_api, source_api
+from airbyte_api_client.api import destination_api, source_api, web_backend_api
 from airbyte_api_client.model.airbyte_catalog import AirbyteCatalog
-from airbyte_api_client.model.connection_create import ConnectionCreate
 from airbyte_api_client.model.connection_id_request_body import ConnectionIdRequestBody
 from airbyte_api_client.model.connection_read import ConnectionRead
 from airbyte_api_client.model.connection_read_list import ConnectionReadList
-from airbyte_api_client.model.connection_search import ConnectionSearch
 from airbyte_api_client.model.connection_status import ConnectionStatus
-from airbyte_api_client.model.connection_update import ConnectionUpdate
 from airbyte_api_client.model.destination_create import DestinationCreate
 from airbyte_api_client.model.destination_id_request_body import DestinationIdRequestBody
 from airbyte_api_client.model.destination_read import DestinationRead
@@ -32,6 +29,9 @@ from airbyte_api_client.model.source_read import SourceRead
 from airbyte_api_client.model.source_read_list import SourceReadList
 from airbyte_api_client.model.source_search import SourceSearch
 from airbyte_api_client.model.source_update import SourceUpdate
+from airbyte_api_client.model.web_backend_connection_create import WebBackendConnectionCreate
+from airbyte_api_client.model.web_backend_connection_search import WebBackendConnectionSearch
+from airbyte_api_client.model.web_backend_connection_update import WebBackendConnectionUpdate
 from click import ClickException
 
 from .diff_helpers import compute_diff, hash_config
@@ -305,7 +305,9 @@ class BaseResource(abc.ABC):
     def _create_or_update(
         self,
         operation_fn: Callable,
-        payload: Union[SourceCreate, SourceUpdate, DestinationCreate, DestinationUpdate, ConnectionCreate, ConnectionUpdate],
+        payload: Union[
+            SourceCreate, SourceUpdate, DestinationCreate, DestinationUpdate, WebBackendConnectionCreate, WebBackendConnectionUpdate
+        ],
         _check_return_type: bool = True,
     ) -> Union[SourceRead, DestinationRead]:
         """Wrapper to trigger create or update of remote resource.
@@ -484,12 +486,12 @@ class Destination(BaseResource):
 
 class Connection(BaseResource):
     APPLY_PRIORITY = 1  # Set to 1 to create connection after source or destination.
-    api = connection_api.ConnectionApi
-    create_function_name = "create_connection"
+    api = web_backend_api.WebBackendApi
+    create_function_name = "web_backend_create_connection"
     resource_id_field = "connection_id"
     ResourceIdRequestBody = ConnectionIdRequestBody
-    search_function_name = "search_connections"
-    update_function_name = "update_connection"
+    search_function_name = "web_backend_search_connections"
+    update_function_name = "web_backend_update_connection"
     resource_type = "connection"
 
     @property
@@ -497,36 +499,38 @@ class Connection(BaseResource):
         return ConnectionStatus(self.local_configuration["configuration"]["status"])
 
     @property
-    def create_payload(self) -> ConnectionCreate:
+    def create_payload(self) -> WebBackendConnectionCreate:
         """Defines the payload to create the remote connection.
         Disable snake case parameter usage with _spec_property_naming=True
 
         Returns:
-            ConnectionCreate: The ConnectionCreate model instance
+            WebBackendConnectionCreate: The WebBackendConnectionCreate model instance
         """
-        return ConnectionCreate(**self.configuration, _check_type=False, _spec_property_naming=True)
+        return WebBackendConnectionCreate(**self.configuration, _check_type=False, _spec_property_naming=True)
 
     @property
-    def search_payload(self) -> ConnectionSearch:
+    def search_payload(self) -> WebBackendConnectionSearch:
         """Defines the payload to search the remote connection. Search by connection name if no state found, otherwise search by connection id found in the state.
         Returns:
             ConnectionSearch: The ConnectionSearch model instance
         """
         if self.state is None:
-            return ConnectionSearch(
+            return WebBackendConnectionSearch(
                 source_id=self.source_id, destination_id=self.destination_id, name=self.resource_name, status=self.status
             )
         else:
-            return ConnectionSearch(connection_id=self.state.resource_id, source_id=self.source_id, destination_id=self.destination_id)
+            return WebBackendConnectionSearch(
+                connection_id=self.state.resource_id, source_id=self.source_id, destination_id=self.destination_id
+            )
 
     @property
-    def update_payload(self) -> ConnectionUpdate:
+    def update_payload(self) -> WebBackendConnectionUpdate:
         """Defines the payload to update a remote connection.
 
         Returns:
-            ConnectionUpdate: The DestinationUpdate model instance.
+            WebBackendConnectionUpdate: The DestinationUpdate model instance.
         """
-        return ConnectionUpdate(
+        return WebBackendConnectionUpdate(
             connection_id=self.resource_id,
             sync_catalog=self.configuration["syncCatalog"],
             status=self.configuration["status"],
@@ -552,7 +556,17 @@ class Connection(BaseResource):
         return self._search_fn(self.api_instance, self.search_payload, _check_return_type=False)
 
     def _get_comparable_configuration(self) -> dict:
-        keys_to_filter_out = ["connectionId", "operationIds", "sourceCatalogId"]
+        keys_to_filter_out = [
+            "connectionId",
+            "operationIds",
+            "sourceCatalogId",
+            "source",
+            "destination",
+            "isSyncing",
+            "latestSyncJobStatus",
+            "latestSyncJobCreatedAt",
+            "operations",
+        ]
         comparable_configuration = super()._get_comparable_configuration()
         return {k: v for k, v in comparable_configuration.items() if k not in keys_to_filter_out}
 
