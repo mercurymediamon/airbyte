@@ -21,5 +21,30 @@ configuration:
   schedule: # OPTIONAL | object
     timeUnit: hours # REQUIRED | string | Allowed values: minutes, hours, days, weeks, months
     units: 1 # REQUIRED | integer
+  {%- if enable_normalization %}
+  operations:
+    - name: "Normalization"
+      operatorConfiguration:
+        normalization:
+          option: "basic"
+        operatorType: "normalization"
+  {%- else %}
+  # operations:
+  ## -------- Uncomment and edit the block below if you want to enable Airbyte normalization --------
+  #   - name: "Normalization"
+  #     operatorConfiguration:
+  #       normalization:
+  #         option: "basic"
+  #       operatorType: "normalization"
+  ## -------- Uncomment and edit the block below if you want to declare a custom transformation --------
+  #   - name: "My dbt transformations" # REQUIRED | string
+  #     operatorConfiguration:
+  #       dbt:
+  #         dbtArguments: "run" # REQUIRED | string | Entrypoint arguments for dbt cli to run the project 
+  #         dockerImage: "fishtownanalytics/dbt:0.19.1" # REQUIRED | string | Docker image URL with dbt installed
+  #         gitRepoBranch: "your-repo-branch-name" # OPTIONAL | string | Git branch name
+  #         gitRepoUrl: "https://github.com/<your git repo>" # REQUIRED | string | Git repository URL of the custom transformation project
+  #       operatorType: dbt # REQUIRED | string | Allowed values: dbt, normalization
+  {%- endif %}
   syncCatalog: # OPTIONAL | object | 🚨 ONLY edit streams.config, streams.stream should not be edited as schema cannot be changed.
     {{ catalog | indent(4)}}
