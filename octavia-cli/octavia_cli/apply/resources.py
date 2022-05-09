@@ -7,7 +7,7 @@ import os
 import time
 from copy import deepcopy
 from pathlib import Path
-from typing import Callable, Optional, Set, Union
+from typing import Callable, List, Optional, Set, Union
 
 import airbyte_api_client
 import yaml
@@ -26,6 +26,10 @@ from airbyte_api_client.model.destination_read import DestinationRead
 from airbyte_api_client.model.destination_sync_mode import DestinationSyncMode
 from airbyte_api_client.model.destination_update import DestinationUpdate
 from airbyte_api_client.model.namespace_definition_type import NamespaceDefinitionType
+from airbyte_api_client.model.operator_configuration import OperatorConfiguration
+from airbyte_api_client.model.operator_dbt import OperatorDbt
+from airbyte_api_client.model.operator_normalization import OperatorNormalization
+from airbyte_api_client.model.operator_type import OperatorType
 from airbyte_api_client.model.resource_requirements import ResourceRequirements
 from airbyte_api_client.model.source_create import SourceCreate
 from airbyte_api_client.model.source_discover_schema_request_body import SourceDiscoverSchemaRequestBody
@@ -35,6 +39,7 @@ from airbyte_api_client.model.source_update import SourceUpdate
 from airbyte_api_client.model.sync_mode import SyncMode
 from airbyte_api_client.model.web_backend_connection_create import WebBackendConnectionCreate
 from airbyte_api_client.model.web_backend_connection_update import WebBackendConnectionUpdate
+from airbyte_api_client.model.web_backend_operation_create_or_update import WebBackendOperationCreateOrUpdate
 from click import ClickException
 
 from .diff_helpers import compute_diff, hash_config
@@ -506,6 +511,7 @@ class Connection(BaseResource):
         configuration = super()._deserialize_raw_configuration()
         self._check_for_legacy_connection_configuration_keys(configuration)
         configuration["sync_catalog"] = self._create_configured_catalog(configuration["sync_catalog"])
+        configuration["operations"] = self._deserialize_operations(configuration["operations"])
         configuration["namespace_definition"] = NamespaceDefinitionType(configuration["namespace_definition"])
         configuration["schedule"] = ConnectionSchedule(**configuration["schedule"])
         configuration["resource_requirements"] = ResourceRequirements(**configuration["resource_requirements"])
@@ -577,6 +583,40 @@ class Connection(BaseResource):
                 )
             )
         return AirbyteCatalog(streams_and_configurations)
+
+    def _deserialize_operations(self, operations: list) -> List[WebBackendOperationCreateOrUpdate]:
+        """Deserialize a sync_catalog represented as dict to an AirbyteCatalog.
+
+        Args:
+            sync_catalog (dict): The sync catalog represented as a dict.
+
+        Returns:
+            AirbyteCatalog: The configured catalog.
+        """
+        deserialized_operations = []
+        for operation in operations:
+            if operation["operator_configuration"]["operator_type"] == "normalization":
+                operation = WebBackendOperationCreateOrUpdate(
+                    workspace_id=self.workspace_id,
+                    name=operation["name"],
+                    operator_configuration=OperatorConfiguration(
+                        operator_type=OperatorType(operation["operator_configuration"]["operator_type"]),
+                        normalization=OperatorNormalization(operation["operator_configuration"]["normalization"]),
+                    ),
+                )
+            elif operation["operator_configuration"]["operator_type"] == "dbt":
+                operation = WebBackendOperationCreateOrUpdate(
+                    workspace_id=self.workspace_id,
+                    name=operation["name"],
+                    operator_configuration=OperatorConfiguration(
+                        operator_type=OperatorType(operation["operator_configuration"]["operator_type"]),
+                    ),
+                    dbt=OperatorDbt(**operation["operator_configuration"]["operator_type"]["dbt"]),
+                )
+            else:
+                raise ValueError(f"Operation type {operation['operator_configuration']['operator_type']} is not supported")
+            deserialized_operations.append(operation)
+        return deserialized_operations
 
     # TODO this check can be removed when all our active user are on >= 0.36.11
     def _check_for_legacy_connection_configuration_keys(self, configuration_to_check):
