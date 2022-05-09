@@ -50,7 +50,7 @@ public class FailureHelper {
     return genericFailure(t, jobId, attemptNumber)
         .withFailureOrigin(origin)
         .withFailureType(FailureReason.FailureType.CONFIG_ERROR)
-//        .withRetryable(false)
+        .withRetryable(false)
         .withExternalMessage(String.format("%s check failed", origin));
   }
 
