@@ -13,6 +13,7 @@ from airbyte_api_client.model.connection_status import ConnectionStatus
 from airbyte_api_client.model.namespace_definition_type import NamespaceDefinitionType
 from airbyte_api_client.model.operation_create import OperationCreate
 from airbyte_api_client.model.resource_requirements import ResourceRequirements
+from airbyte_api_client.model.web_backend_operation_create_or_update import WebBackendOperationCreateOrUpdate
 from octavia_cli.apply import resources, yaml_loaders
 
 
@@ -496,7 +497,7 @@ class TestConnection:
                 connection_id=state.resource_id, with_refreshed_catalog=False
             )
 
-    def test_create_payload_no_normalization(self, mocker, mock_api_client, connection_configuration, request):
+    def test_create_payload_no_normalization(self, mocker, mock_api_client, connection_configuration):
         assert resources.Connection.__base__ == resources.BaseResource
         mocker.patch.object(resources.Connection, "resource_id", "foo")
         connection = resources.Connection(mock_api_client, "workspace_id", connection_configuration, "bar.yaml")
@@ -508,7 +509,7 @@ class TestConnection:
         )
         assert "operations" not in connection.create_payload
 
-    def test_create_payload_with_normalization(self, mocker, mock_api_client, connection_configuration_with_normalization, request):
+    def test_create_payload_with_normalization(self, mocker, mock_api_client, connection_configuration_with_normalization):
         assert resources.Connection.__base__ == resources.BaseResource
         mocker.patch.object(resources.Connection, "resource_id", "foo")
         connection = resources.Connection(mock_api_client, "workspace_id", connection_configuration_with_normalization, "bar.yaml")
@@ -519,6 +520,26 @@ class TestConnection:
             **connection.configuration,
         )
         assert isinstance(connection.create_payload["operations"][0], OperationCreate)
+
+    def test_update_payload_no_normalization(self, mocker, mock_api_client, connection_configuration):
+        assert resources.Connection.__base__ == resources.BaseResource
+        mocker.patch.object(resources.Connection, "resource_id", "foo")
+        connection = resources.Connection(mock_api_client, "workspace_id", connection_configuration, "bar.yaml")
+        assert connection.update_payload == resources.WebBackendConnectionUpdate(
+            connection_id=connection.resource_id,
+            **connection.configuration,
+        )
+        assert "operations" not in connection.update_payload
+
+    def test_update_payload_with_normalization(self, mocker, mock_api_client, connection_configuration_with_normalization):
+        assert resources.Connection.__base__ == resources.BaseResource
+        mocker.patch.object(resources.Connection, "resource_id", "foo")
+        connection = resources.Connection(mock_api_client, "workspace_id", connection_configuration_with_normalization, "bar.yaml")
+        assert connection.update_payload == resources.WebBackendConnectionUpdate(
+            connection_id=connection.resource_id,
+            **connection.configuration,
+        )
+        assert isinstance(connection.update_payload["operations"][0], WebBackendOperationCreateOrUpdate)
 
     def test_get_remote_comparable_configuration(self, mocker, mock_api_client, connection_configuration):
         mocker.patch.object(

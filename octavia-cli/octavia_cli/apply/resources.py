@@ -536,7 +536,7 @@ class Connection(BaseResource):
         """
         if self.raw_configuration["configuration"].get("operations") is not None:
             self.configuration["operations"] = self._deserialize_operations(
-                self.raw_configuration["configuration"], WebBackendOperationCreateOrUpdate
+                self.raw_configuration["configuration"]["operations"], WebBackendOperationCreateOrUpdate
             )
         return WebBackendConnectionUpdate(connection_id=self.resource_id, **self.configuration)
 
