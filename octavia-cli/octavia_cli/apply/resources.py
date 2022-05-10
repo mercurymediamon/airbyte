@@ -509,8 +509,11 @@ class Connection(BaseResource):
         Returns:
             WebBackendConnectionCreate: The WebBackendConnectionCreate model instance
         """
-        if self.configuration.get("operations") is not None:
-            self.configuration["operations"] = self._deserialize_operations(self.configuration["operations"], OperationCreate)
+
+        if self.raw_configuration["configuration"].get("operations") is not None:
+            self.configuration["operations"] = self._deserialize_operations(
+                self.raw_configuration["configuration"]["operations"], OperationCreate
+            )
         return WebBackendConnectionCreate(
             name=self.resource_name, source_id=self.source_id, destination_id=self.destination_id, **self.configuration
         )
@@ -531,9 +534,9 @@ class Connection(BaseResource):
         Returns:
             WebBackendConnectionUpdate: The DestinationUpdate model instance.
         """
-        if self.configuration.get("operations") is not None:
+        if self.raw_configuration["configuration"].get("operations") is not None:
             self.configuration["operations"] = self._deserialize_operations(
-                self.configuration["operations"], WebBackendOperationCreateOrUpdate
+                self.raw_configuration["configuration"], WebBackendOperationCreateOrUpdate
             )
         return WebBackendConnectionUpdate(connection_id=self.resource_id, **self.configuration)
 
@@ -569,6 +572,7 @@ class Connection(BaseResource):
     def _deserialize_operations(
         self, operations: list, outputModelCls: Union[Type[OperationCreate], Type[WebBackendOperationCreateOrUpdate]]
     ) -> List[Union[OperationCreate, WebBackendOperationCreateOrUpdate]]:
+        # TODO rework docstring
         """Deserialize a sync_catalog represented as dict to an AirbyteCatalog.
 
         Args:

@@ -2,6 +2,7 @@
 # Copyright (c) 2021 Airbyte, Inc., all rights reserved.
 #
 
+from copy import deepcopy
 from unittest.mock import mock_open, patch
 
 import pytest
@@ -10,6 +11,7 @@ from airbyte_api_client.model.airbyte_catalog import AirbyteCatalog
 from airbyte_api_client.model.connection_schedule import ConnectionSchedule
 from airbyte_api_client.model.connection_status import ConnectionStatus
 from airbyte_api_client.model.namespace_definition_type import NamespaceDefinitionType
+from airbyte_api_client.model.operation_create import OperationCreate
 from airbyte_api_client.model.resource_requirements import ResourceRequirements
 from octavia_cli.apply import resources, yaml_loaders
 
@@ -382,6 +384,14 @@ class TestConnection:
         }
 
     @pytest.fixture
+    def connection_configuration_with_normalization(self, connection_configuration):
+        connection_configuration_with_normalization = deepcopy(connection_configuration)
+        connection_configuration_with_normalization["configuration"]["operations"] = [
+            {"name": "Normalization", "operator_configuration": {"normalization": {"option": "basic"}, "operator_type": "normalization"}}
+        ]
+        return connection_configuration_with_normalization
+
+    @pytest.fixture
     def legacy_connection_configurations(self):
         return [
             {
@@ -476,12 +486,6 @@ class TestConnection:
         assert connection.resource_type == "connection"
         assert connection.APPLY_PRIORITY == 1
 
-        assert connection.create_payload == resources.WebBackendConnectionCreate(
-            name=connection.resource_name,
-            source_id=connection.source_id,
-            destination_id=connection.destination_id,
-            **connection.configuration,
-        )
         assert connection.update_payload == resources.WebBackendConnectionUpdate(
             connection_id=connection.resource_id, **connection.configuration
         )
@@ -491,6 +495,30 @@ class TestConnection:
             assert connection.get_payload == resources.WebBackendConnectionRequestBody(
                 connection_id=state.resource_id, with_refreshed_catalog=False
             )
+
+    def test_create_payload_no_normalization(self, mocker, mock_api_client, connection_configuration, request):
+        assert resources.Connection.__base__ == resources.BaseResource
+        mocker.patch.object(resources.Connection, "resource_id", "foo")
+        connection = resources.Connection(mock_api_client, "workspace_id", connection_configuration, "bar.yaml")
+        assert connection.create_payload == resources.WebBackendConnectionCreate(
+            name=connection.resource_name,
+            source_id=connection.source_id,
+            destination_id=connection.destination_id,
+            **connection.configuration,
+        )
+        assert "operations" not in connection.create_payload
+
+    def test_create_payload_with_normalization(self, mocker, mock_api_client, connection_configuration_with_normalization, request):
+        assert resources.Connection.__base__ == resources.BaseResource
+        mocker.patch.object(resources.Connection, "resource_id", "foo")
+        connection = resources.Connection(mock_api_client, "workspace_id", connection_configuration_with_normalization, "bar.yaml")
+        assert connection.create_payload == resources.WebBackendConnectionCreate(
+            name=connection.resource_name,
+            source_id=connection.source_id,
+            destination_id=connection.destination_id,
+            **connection.configuration,
+        )
+        assert isinstance(connection.create_payload["operations"][0], OperationCreate)
 
     def test_get_remote_comparable_configuration(self, mocker, mock_api_client, connection_configuration):
         mocker.patch.object(
