@@ -4,9 +4,9 @@
 
 package io.airbyte.integrations.destination.redshift;
 
-import static io.airbyte.integrations.destination.redshift.RedshiftInsertDestination.getJdbcDatabase;
-
 import com.fasterxml.jackson.databind.JsonNode;
+import io.airbyte.db.factory.DataSourceFactory;
+import io.airbyte.db.jdbc.DefaultJdbcDatabase;
 import io.airbyte.db.jdbc.JdbcDatabase;
 import io.airbyte.integrations.base.AirbyteMessageConsumer;
 import io.airbyte.integrations.destination.ExtendedNameTransformer;
@@ -21,6 +21,7 @@ import io.airbyte.integrations.destination.s3.S3StorageOperations;
 import io.airbyte.protocol.models.AirbyteMessage;
 import io.airbyte.protocol.models.ConfiguredAirbyteCatalog;
 import java.util.function.Consumer;
+import javax.sql.DataSource;
 
 /**
  * A more efficient Redshift Destination than the sql-based {@link RedshiftDestination}. Instead of
@@ -37,7 +38,7 @@ public class RedshiftCopyS3Destination extends CopyDestination {
 
   private final RedshiftDataTmpTableMode redshiftDataTmpTableMode;
 
-  public RedshiftCopyS3Destination(RedshiftDataTmpTableMode redshiftDataTmpTableMode) {
+  public RedshiftCopyS3Destination(final RedshiftDataTmpTableMode redshiftDataTmpTableMode) {
     this.redshiftDataTmpTableMode = redshiftDataTmpTableMode;
   }
 
@@ -48,7 +49,7 @@ public class RedshiftCopyS3Destination extends CopyDestination {
       throws Exception {
     return CopyConsumerFactory.create(
         outputRecordCollector,
-        getDatabase(config),
+        getDatabase(getDataSource(config)),
         getSqlOperations(),
         getNameTransformer(),
         S3CopyConfig.getS3CopyConfig(config),
@@ -69,8 +70,19 @@ public class RedshiftCopyS3Destination extends CopyDestination {
   }
 
   @Override
-  public JdbcDatabase getDatabase(final JsonNode config) {
-    return getJdbcDatabase(config);
+  public DataSource getDataSource(final JsonNode config) {
+    final var jdbcConfig = RedshiftInsertDestination.getJdbcConfig(config);
+    return DataSourceFactory.create(
+        jdbcConfig.get(RedshiftInsertDestination.USERNAME).asText(),
+        jdbcConfig.has(RedshiftInsertDestination.PASSWORD) ? jdbcConfig.get(RedshiftInsertDestination.PASSWORD).asText() : null,
+        RedshiftInsertDestination.DRIVER_CLASS,
+        jdbcConfig.get(RedshiftInsertDestination.JDBC_URL).asText(),
+        RedshiftInsertDestination.SSL_JDBC_PARAMETERS);
+  }
+
+  @Override
+  public JdbcDatabase getDatabase(final DataSource dataSource) {
+    return new DefaultJdbcDatabase(dataSource);
   }
 
   public SqlOperations getSqlOperations() {
