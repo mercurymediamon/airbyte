@@ -96,7 +96,6 @@ class TestBaseResource:
         mocker.patch.object(resources.BaseResource, "__abstractmethods__", set())
         mocker.patch.object(resources.BaseResource, "create_function_name", "create_resource")
         mocker.patch.object(resources.BaseResource, "resource_id_field", "resource_id")
-        mocker.patch.object(resources.BaseResource, "ResourceIdRequestBody")
         mocker.patch.object(resources.BaseResource, "update_function_name", "update_resource")
         mocker.patch.object(resources.BaseResource, "get_function_name", "get_resource")
         mocker.patch.object(resources.BaseResource, "resource_type", "universal_resource")
@@ -171,20 +170,6 @@ class TestBaseResource:
             assert state == resources.ResourceState.from_file.return_value
         else:
             assert state is None
-
-    @pytest.mark.parametrize(
-        "resource_id",
-        [None, "foo"],
-    )
-    def test_resource_id_request_body(self, mocker, resource_id, resource):
-        mocker.patch.object(resources.BaseResource, "resource_id", resource_id)
-        if resource_id is None:
-            with pytest.raises(resources.NonExistingResourceError):
-                resource.resource_id_request_body
-                resource.ResourceIdRequestBody.assert_not_called()
-        else:
-            assert resource.resource_id_request_body == resource.ResourceIdRequestBody.return_value
-            resource.ResourceIdRequestBody.assert_called_with(resource_id)
 
     @pytest.mark.parametrize(
         "was_created",
@@ -503,7 +488,9 @@ class TestConnection:
         if state is None:
             assert connection.get_payload is None
         else:
-            assert connection.get_payload == resources.ConnectionIdRequestBody(state.resource_id)
+            assert connection.get_payload == resources.WebBackendConnectionRequestBody(
+                connection_id=state.resource_id, with_refreshed_catalog=False
+            )
 
     def test_get_remote_comparable_configuration(self, mocker, mock_api_client, connection_configuration):
         mocker.patch.object(
