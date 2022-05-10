@@ -78,6 +78,10 @@ public class ConnectionManagerWorkflowImpl implements ConnectionManagerWorkflow 
   private static final String RENAME_ATTEMPT_ID_TO_NUMBER_TAG = "rename_attempt_id_to_number";
   private static final int RENAME_ATTEMPT_ID_TO_NUMBER_CURRENT_VERSION = 1;
 
+
+  private static final String CHECK_BEFORE_SYNC_TAG = "check_before_sync";
+  private static final int CHECK_BEFORE_SYNC_CURRENT_VERSION = 1;
+
   private WorkflowState workflowState = new WorkflowState(UUID.randomUUID(), new NoopStateListener());
 
   private final WorkflowInternalState workflowInternalState = new WorkflowInternalState();
@@ -301,6 +305,13 @@ public class ConnectionManagerWorkflowImpl implements ConnectionManagerWorkflow 
   }
 
   private StandardSyncOutput checkConnections(GenerateInputActivity.GeneratedJobInput jobInputs) {
+    final int attemptCreationVersion =
+        Workflow.getVersion(CHECK_BEFORE_SYNC_TAG, Workflow.DEFAULT_VERSION, CHECK_BEFORE_SYNC_CURRENT_VERSION);
+
+    if (attemptCreationVersion < CHECK_BEFORE_SYNC_CURRENT_VERSION) {
+      return null;
+    }
+
     final StandardCheckConnectionInput sourceConfiguration = new StandardCheckConnectionInput()
         .withConnectionConfiguration(jobInputs.getSyncInput().getSourceConfiguration());
     final CheckConnectionInput checkSourceInput =
@@ -326,6 +337,7 @@ public class ConnectionManagerWorkflowImpl implements ConnectionManagerWorkflow 
       log.info("DESTINATION CHECK: Successful");
     }
 
+    // return no failure response if the CHECKS succeed
     return null;
   }
 
