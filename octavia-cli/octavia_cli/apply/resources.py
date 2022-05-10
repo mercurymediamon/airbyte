@@ -7,7 +7,7 @@ import os
 import time
 from copy import deepcopy
 from pathlib import Path
-from typing import Callable, List, Optional, Set, Union
+from typing import Callable, List, Optional, Set, Type, Union
 
 import airbyte_api_client
 import yaml
@@ -16,7 +16,6 @@ from airbyte_api_client.model.airbyte_catalog import AirbyteCatalog
 from airbyte_api_client.model.airbyte_stream import AirbyteStream
 from airbyte_api_client.model.airbyte_stream_and_configuration import AirbyteStreamAndConfiguration
 from airbyte_api_client.model.airbyte_stream_configuration import AirbyteStreamConfiguration
-from airbyte_api_client.model.connection_id_request_body import ConnectionIdRequestBody
 from airbyte_api_client.model.connection_read import ConnectionRead
 from airbyte_api_client.model.connection_schedule import ConnectionSchedule
 from airbyte_api_client.model.connection_status import ConnectionStatus
@@ -26,6 +25,7 @@ from airbyte_api_client.model.destination_read import DestinationRead
 from airbyte_api_client.model.destination_sync_mode import DestinationSyncMode
 from airbyte_api_client.model.destination_update import DestinationUpdate
 from airbyte_api_client.model.namespace_definition_type import NamespaceDefinitionType
+from airbyte_api_client.model.operation_create import OperationCreate
 from airbyte_api_client.model.operator_configuration import OperatorConfiguration
 from airbyte_api_client.model.operator_dbt import OperatorDbt
 from airbyte_api_client.model.operator_normalization import OperatorNormalization
@@ -38,6 +38,7 @@ from airbyte_api_client.model.source_read import SourceRead
 from airbyte_api_client.model.source_update import SourceUpdate
 from airbyte_api_client.model.sync_mode import SyncMode
 from airbyte_api_client.model.web_backend_connection_create import WebBackendConnectionCreate
+from airbyte_api_client.model.web_backend_connection_request_body import WebBackendConnectionRequestBody
 from airbyte_api_client.model.web_backend_connection_update import WebBackendConnectionUpdate
 from airbyte_api_client.model.web_backend_operation_create_or_update import WebBackendOperationCreateOrUpdate
 from click import ClickException
@@ -185,13 +186,6 @@ class BaseResource(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def ResourceIdRequestBody(
-        self,
-    ):  # pragma: no cover
-        pass
-
-    @property
-    @abc.abstractmethod
     def resource_type(
         self,
     ):  # pragma: no cover
@@ -212,6 +206,7 @@ class BaseResource(abc.ABC):
         self._update_fn = getattr(self.api, self.update_function_name)
         self._get_fn = getattr(self.api, self.get_function_name)
 
+        self.workspace_id = workspace_id
         self.configuration_path = configuration_path
         self.state = self._get_state_from_file(configuration_path)
         self.configuration_hash = hash_config(
@@ -223,7 +218,6 @@ class BaseResource(abc.ABC):
         self.raw_configuration = raw_configuration
         self.configuration = self._deserialize_raw_configuration()
         self.api_instance = self.api(api_client)
-        self.workspace_id = workspace_id
         self.resource_name = raw_configuration["resource_name"]
 
     def _deserialize_raw_configuration(self):
@@ -359,20 +353,6 @@ class BaseResource(abc.ABC):
         """
         return self.state.resource_id if self.state is not None else None
 
-    @property
-    def resource_id_request_body(self) -> Union[SourceIdRequestBody, DestinationIdRequestBody]:
-        """Creates SourceIdRequestBody or DestinationIdRequestBody from resource id.
-
-        Raises:
-            NonExistingResourceError: raised if the resource id is None.
-
-        Returns:
-            Union[SourceIdRequestBody, DestinationIdRequestBody]: The model instance.
-        """
-        if self.resource_id is None:
-            raise NonExistingResourceError("The resource id could not be retrieved, the remote resource is not existing.")
-        return self.ResourceIdRequestBody(self.resource_id)
-
 
 class SourceAndDestination(BaseResource):
     @property
@@ -396,7 +376,6 @@ class Source(SourceAndDestination):
     api = source_api.SourceApi
     create_function_name = "create_source"
     resource_id_field = "source_id"
-    ResourceIdRequestBody = SourceIdRequestBody
     get_function_name = "get_source"
     update_function_name = "update_source"
     resource_type = "source"
@@ -451,7 +430,6 @@ class Destination(SourceAndDestination):
     api = destination_api.DestinationApi
     create_function_name = "create_destination"
     resource_id_field = "destination_id"
-    ResourceIdRequestBody = DestinationIdRequestBody
     get_function_name = "get_destination"
     update_function_name = "update_destination"
     resource_type = "destination"
@@ -495,7 +473,6 @@ class Connection(BaseResource):
     update_function_name = "web_backend_update_connection"
     get_function_name = "web_backend_get_connection"
     resource_id_field = "connection_id"
-    ResourceIdRequestBody = ConnectionIdRequestBody
 
     resource_type = "connection"
 
@@ -511,7 +488,6 @@ class Connection(BaseResource):
         configuration = super()._deserialize_raw_configuration()
         self._check_for_legacy_connection_configuration_keys(configuration)
         configuration["sync_catalog"] = self._create_configured_catalog(configuration["sync_catalog"])
-        configuration["operations"] = self._deserialize_operations(configuration["operations"])
         configuration["namespace_definition"] = NamespaceDefinitionType(configuration["namespace_definition"])
         configuration["schedule"] = ConnectionSchedule(**configuration["schedule"])
         configuration["resource_requirements"] = ResourceRequirements(**configuration["resource_requirements"])
@@ -533,18 +509,20 @@ class Connection(BaseResource):
         Returns:
             WebBackendConnectionCreate: The WebBackendConnectionCreate model instance
         """
+        if self.configuration.get("operations") is not None:
+            self.configuration["operations"] = self._deserialize_operations(self.configuration["operations"], OperationCreate)
         return WebBackendConnectionCreate(
             name=self.resource_name, source_id=self.source_id, destination_id=self.destination_id, **self.configuration
         )
 
     @property
-    def get_payload(self) -> Optional[ConnectionIdRequestBody]:
+    def get_payload(self) -> Optional[WebBackendConnectionRequestBody]:
         """Defines the payload to retrieve the remote connection if a state exists.
         Returns:
             ConnectionIdRequestBody: The ConnectionIdRequestBody payload.
         """
         if self.state is not None:
-            return ConnectionIdRequestBody(self.state.resource_id)
+            return WebBackendConnectionRequestBody(connection_id=self.state.resource_id, with_refreshed_catalog=False)
 
     @property
     def update_payload(self) -> WebBackendConnectionUpdate:
@@ -553,6 +531,10 @@ class Connection(BaseResource):
         Returns:
             WebBackendConnectionUpdate: The DestinationUpdate model instance.
         """
+        if self.configuration.get("operations") is not None:
+            self.configuration["operations"] = self._deserialize_operations(
+                self.configuration["operations"], WebBackendOperationCreateOrUpdate
+            )
         return WebBackendConnectionUpdate(connection_id=self.resource_id, **self.configuration)
 
     def create(self) -> dict:
@@ -584,28 +566,30 @@ class Connection(BaseResource):
             )
         return AirbyteCatalog(streams_and_configurations)
 
-    def _deserialize_operations(self, operations: list) -> List[WebBackendOperationCreateOrUpdate]:
+    def _deserialize_operations(
+        self, operations: list, outputModelCls: Union[Type[OperationCreate], Type[WebBackendOperationCreateOrUpdate]]
+    ) -> List[Union[OperationCreate, WebBackendOperationCreateOrUpdate]]:
         """Deserialize a sync_catalog represented as dict to an AirbyteCatalog.
 
         Args:
             sync_catalog (dict): The sync catalog represented as a dict.
-
+            outputModelCls (Union[Type[OperationCreate], Type[WebBackendOperationCreateOrUpdate]]): the model class to which the operations will be deserialized
         Returns:
             AirbyteCatalog: The configured catalog.
         """
         deserialized_operations = []
         for operation in operations:
             if operation["operator_configuration"]["operator_type"] == "normalization":
-                operation = WebBackendOperationCreateOrUpdate(
+                operation = outputModelCls(
                     workspace_id=self.workspace_id,
                     name=operation["name"],
                     operator_configuration=OperatorConfiguration(
                         operator_type=OperatorType(operation["operator_configuration"]["operator_type"]),
-                        normalization=OperatorNormalization(operation["operator_configuration"]["normalization"]),
+                        normalization=OperatorNormalization(**operation["operator_configuration"]["normalization"]),
                     ),
                 )
             elif operation["operator_configuration"]["operator_type"] == "dbt":
-                operation = WebBackendOperationCreateOrUpdate(
+                operation = outputModelCls(
                     workspace_id=self.workspace_id,
                     name=operation["name"],
                     operator_configuration=OperatorConfiguration(
@@ -644,18 +628,29 @@ class Connection(BaseResource):
             )
 
     def _get_remote_comparable_configuration(self) -> dict:
-        keys_to_filter_out = [
+        root_level_keys_to_filter_out = [
             "name",
+            "source",
+            "destination",
             "source_id",
             "destination_id",
             "connection_id",
             "operation_ids",
             "source_catalog_id",
+            "catalog_id",
             "is_syncing",
             "latest_sync_job_status",
             "latest_sync_job_created_at",
         ]  # We do not allow local editing of these keys
-        return {k: v for k, v in self.remote_resource.to_dict().items() if k not in keys_to_filter_out}
+        comparable = {k: v for k, v in self.remote_resource.to_dict().items() if k not in root_level_keys_to_filter_out}
+        if "operations" in comparable:
+            operation_level_keys_to_filter_out = ["workspace_id", "operation_id"]
+            for operation in comparable["operations"]:
+                for k in operation_level_keys_to_filter_out:
+                    operation.pop(k)
+                if "dbt" in operation["operator_configuration"] and operation["operator_configuration"]["dbt"] is None:
+                    operation["operator_configuration"].pop("dbt")
+        return comparable
 
 
 def factory(api_client: airbyte_api_client.ApiClient, workspace_id: str, configuration_path: str) -> Union[Source, Destination, Connection]:

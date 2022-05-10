@@ -18,6 +18,13 @@ configuration:
   schedule: # OPTIONAL | object
     time_unit: hours # REQUIRED | string | Allowed values: minutes, hours, days, weeks, months
     units: 1 # REQUIRED | integer
+  operations:
+    # -------- Uncomment and edit the block below if you want to enable Airbyte normalization --------
+    - name: "Normalization"
+      operator_configuration:
+        normalization:
+          option: "basic"
+        operator_type: "normalization"
   sync_catalog: # OPTIONAL | object | 🚨 ONLY edit streams.config, streams.stream should not be edited as schema cannot be changed.
     streams:
       - config:
