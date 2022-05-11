@@ -12,6 +12,7 @@ from airbyte_api_client.model.connection_schedule import ConnectionSchedule
 from airbyte_api_client.model.connection_status import ConnectionStatus
 from airbyte_api_client.model.namespace_definition_type import NamespaceDefinitionType
 from airbyte_api_client.model.operation_create import OperationCreate
+from airbyte_api_client.model.operator_type import OperatorType
 from airbyte_api_client.model.resource_requirements import ResourceRequirements
 from airbyte_api_client.model.web_backend_operation_create_or_update import WebBackendOperationCreateOrUpdate
 from octavia_cli.apply import resources, yaml_loaders
@@ -598,6 +599,46 @@ class TestConnection:
             "status",
             "resource_requirements",
         ]
+
+    def test__deserialize_operations(self, mock_api_client, connection_configuration):
+        resource = resources.Connection(mock_api_client, "workspace_id", connection_configuration, "bar.yaml")
+        operations = [
+            {
+                "operator_configuration": {"operator_type": "normalization", "normalization": {"option": "basic"}},
+                "name": "operation-with-normalization",
+            },
+            {
+                "operator_configuration": {
+                    "operator_type": "dbt",
+                    "dbt": {
+                        "dbt_arguments": "run",
+                        "docker_image": "fishtownanalytics/dbt:0.19.1",
+                        "git_repo_branch": "my-branch-name",
+                        "git_repo_url": "https://github.com/airbytehq/airbyte",
+                    },
+                },
+                "name": "operation-with-custom_dbt",
+            },
+        ]
+        deserialized_operations = resource._deserialize_operations(operations, OperationCreate)
+        assert len(deserialized_operations) == 2
+        assert all([isinstance(o, OperationCreate) for o in deserialized_operations])
+        assert "normalization" in deserialized_operations[0]["operator_configuration"] and deserialized_operations[0][
+            "operator_configuration"
+        ]["operator_type"] == OperatorType("normalization")
+        assert "dbt" in deserialized_operations[1]["operator_configuration"]
+        assert deserialized_operations[1]["operator_configuration"]["operator_type"] == OperatorType("dbt")
+
+        with pytest.raises(ValueError):
+            resource._deserialize_operations(
+                [
+                    {
+                        "operator_configuration": {"operator_type": "not-supported", "normalization": {"option": "basic"}},
+                        "name": "operation-not-supported",
+                    },
+                ],
+                OperationCreate,
+            )
 
     def test__create_configured_catalog(self, mock_api_client, connection_configuration):
         resource = resources.Connection(mock_api_client, "workspace_id", connection_configuration, "bar.yaml")

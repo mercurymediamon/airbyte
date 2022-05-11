@@ -598,8 +598,8 @@ class Connection(BaseResource):
                     name=operation["name"],
                     operator_configuration=OperatorConfiguration(
                         operator_type=OperatorType(operation["operator_configuration"]["operator_type"]),
+                        dbt=OperatorDbt(**operation["operator_configuration"]["dbt"]),
                     ),
-                    dbt=OperatorDbt(**operation["operator_configuration"]["operator_type"]["dbt"]),
                 )
             else:
                 raise ValueError(f"Operation type {operation['operator_configuration']['operator_type']} is not supported")
