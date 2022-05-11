@@ -1,0 +1,229 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "properties": {
+    "request": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "query": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "language",
+        "query",
+        "type",
+        "unit"
+      ]
+    },
+    "location": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "country": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "lat": {
+          "type": "string"
+        },
+        "lon": {
+          "type": "string"
+        },
+        "timezone_id": {
+          "type": "string"
+        },
+        "localtime": {
+          "type": "string"
+        },
+        "localtime_epoch": {
+          "type": "integer"
+        },
+        "utc_offset": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "country",
+        "lat",
+        "localtime",
+        "localtime_epoch",
+        "lon",
+        "name",
+        "region",
+        "timezone_id",
+        "utc_offset"
+      ]
+    },
+    "current": {
+      "type": "object",
+      "properties": {
+        "observation_time": {
+          "type": "string"
+        },
+        "temperature": {
+          "type": "integer"
+        },
+        "weather_code": {
+          "type": "integer"
+        },
+        "weather_icons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "weather_descriptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "wind_speed": {
+          "type": "integer"
+        },
+        "wind_degree": {
+          "type": "integer"
+        },
+        "wind_dir": {
+          "type": "string"
+        },
+        "pressure": {
+          "type": "integer"
+        },
+        "precip": {
+          "type": "integer"
+        },
+        "humidity": {
+          "type": "integer"
+        },
+        "cloudcover": {
+          "type": "integer"
+        },
+        "feelslike": {
+          "type": "integer"
+        },
+        "uv_index": {
+          "type": "integer"
+        },
+        "visibility": {
+          "type": "integer"
+        },
+        "is_day": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cloudcover",
+        "feelslike",
+        "humidity",
+        "is_day",
+        "observation_time",
+        "precip",
+        "pressure",
+        "temperature",
+        "uv_index",
+        "visibility",
+        "weather_code",
+        "weather_descriptions",
+        "weather_icons",
+        "wind_degree",
+        "wind_dir",
+        "wind_speed"
+      ]
+    },
+    "forecast": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "date_epoch": {
+            "type": "integer"
+          },
+          "astro": {
+            "type": "object",
+            "properties": {
+              "sunrise": {
+                "type": "string"
+              },
+              "sunset": {
+                "type": "string"
+              },
+              "moonrise": {
+                "type": "string"
+              },
+              "moonset": {
+                "type": "string"
+              },
+              "moon_phase": {
+                "type": "string"
+              },
+              "moon_illumination": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "moon_illumination",
+              "moon_phase",
+              "moonrise",
+              "moonset",
+              "sunrise",
+              "sunset"
+            ]
+          },
+          "mintemp": {
+            "type": "integer"
+          },
+          "maxtemp": {
+            "type": "integer"
+          },
+          "avgtemp": {
+            "type": "integer"
+          },
+          "totalsnow": {
+            "type": "integer"
+          },
+          "sunhour": {
+            "type": "number"
+          },
+          "uv_index": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "astro",
+          "avgtemp",
+          "date",
+          "date_epoch",
+          "maxtemp",
+          "mintemp",
+          "sunhour",
+          "totalsnow",
+          "uv_index"
+        ]
+      }
+    }
+  },
+  "required": [
+    "current",
+    "forecast",
+    "location",
+    "request"
+  ]
+}
